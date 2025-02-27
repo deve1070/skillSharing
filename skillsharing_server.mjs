@@ -1,5 +1,5 @@
 import {createServer, request} from "node:http";
-import serverStatic from "server-static";
+import serverStatic from "serve-static";
 
 
 function notFound(request,response){
@@ -154,4 +154,4 @@ SkillShareServer.prototype.updated=function(){
     this.waiting=[];
 }
  
-new SkillShareServer({}.start(8000))
+new SkillShareServer({}).start(8000)

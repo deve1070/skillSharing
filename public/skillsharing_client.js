@@ -55,6 +55,15 @@ function renderUserField(name,dispatch){
         }
     }))
 }
+function elt(type, props, ...children) {
+    let dom = document.createElement(type);
+    if (props) Object.assign(dom, props);
+    for (let child of children) {
+      if (typeof child != "string") dom.appendChild(child);
+      else dom.appendChild(document.createTextNode(child));
+    }
+    return dom;
+  }
 
 function renderTalk(talk,dispatch){
     return elt(
@@ -106,3 +115,65 @@ function renderTalkForm(dispatch){
        elt("lable",null, "Summary: ", summary),
         elt("button",{type:"submit"}, "Submit"));
 }
+
+async function pollTalks(update) {
+    let tag=undefined;
+    for (;;){
+        let response;
+        try {
+            response =await fetchOk("/talks",{
+                headers:tag && {"If-None-Match":tag,
+                                 "Prefer":"wait=90"}
+            });
+        }catch (e){
+            console.log("Request Failed: " +e);
+            await new Promise(resolve =>setTimeout(resolve,500))
+            continue;
+        }
+        if (response.status==304) continue;
+        tag=response.headers.get("ETag");
+        update(await response.json())
+    }
+    
+}
+
+class SkillShareApp{
+   constructor(state,dispatch){
+    this.dispatch=dispatch;
+    this.talkDOM=elt("div",{className:"talks"});
+    this.dom=elt("div",null,
+                  renderUserField(state.user,dispatch),
+                  this.talkDOM,
+                  renderTalkForm(dispatch));
+    this.syncState(state)
+   }
+   syncState(state){
+        if (state.talks != this.talks){
+            this.talkDOM.textContent=" ";
+            for (let talk of state.talks){
+                this.talkDOM.appendChild(
+                    renderTalk(talk,this.dispatch))
+            }
+        }this.talks=state.talks;
+    }
+   }
+
+
+function runApp(){
+    let user= localStorage.getItem("userName") || "Dawit";
+    let state,app;
+    function dispatch(action){
+        state=handleAction(state,action);
+        app.syncState(state);
+    }
+    pollTalks(talks =>{
+        if(!app){
+            state={user,talks};
+            app=new SkillShareApp(state,dispatch);
+            document.body.appendChild(app.dom);
+        }else {
+            dispatch({type:"setTalks",talks});
+        }
+    }).catch(reportError)
+}
+runApp()
